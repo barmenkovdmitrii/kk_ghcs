@@ -62,6 +62,14 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
+  flutter_fancy_tree_view:
+    dependency: "direct main"
+    description:
+      name: flutter_fancy_tree_view
+      sha256: e8ef261170be1d63fe56843baa2b501fc353196eadef51d848e882d8cbe10c31
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.6.0"
   flutter_lints:
     dependency: "direct dev"
     description:
@@ -75,14 +83,6 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
-  flutter_treeview:
-    dependency: "direct main"
-    description:
-      name: flutter_treeview
-      sha256: ce7a66452e02877700890cb674773ea0af28d914192acfb5bf55a50ce35b5819
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.0.7+1"
   leak_tracker:
     dependency: transitive
     description:
