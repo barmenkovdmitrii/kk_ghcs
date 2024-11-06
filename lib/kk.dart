@@ -1,16 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_fancy_tree_view/flutter_fancy_tree_view.dart';
 
 void main() => runApp(const MaterialApp(home: Scaffold(body: MyTreeView())));
 
+// Класс для хранения иерархических данных
 class MyNode {
-  const MyNode({
-    required this.title,
-    List<MyNode>? children,
-  }) : children = children ?? const [];
+  String title;
+  List<MyNode> children;
 
-  final String title;
-  final List<MyNode> children; // Делаем это поле final
+  MyNode({required this.title, this.children = const []});
 }
 
 class MyTreeView extends StatefulWidget {
@@ -21,13 +18,13 @@ class MyTreeView extends StatefulWidget {
 }
 
 class _MyTreeViewState extends State<MyTreeView> {
-  static List<MyNode> roots = <MyNode>[
+  final List<MyNode> roots = [
     MyNode(
       title: 'Root 1',
-      children: <MyNode>[
+      children: [
         MyNode(
           title: 'Node 1.1',
-          children: <MyNode>[
+          children: [
             MyNode(title: 'Node 1.1.1'),
             MyNode(title: 'Node 1.1.2'),
           ],
@@ -35,78 +32,62 @@ class _MyTreeViewState extends State<MyTreeView> {
         MyNode(title: 'Node 1.2'),
       ],
     ),
-    MyNode(
-      title: 'Root 2',
-      children: <MyNode>[
-        MyNode(
-          title: 'Node 2.1',
-          children: <MyNode>[
-            MyNode(title: 'Node 2.1.1'),
-          ],
-        ),
-        MyNode(title: 'Node 2.2')
-      ],
-    ),
   ];
 
-  late final TreeController<MyNode> treeController;
+  MyNode? selectedNode;
 
-  @override
-  void initState() {
-    super.initState();
-    treeController = TreeController<MyNode>(
-      roots: roots,
-      childrenProvider: (MyNode node) => node.children,
-    );
-  }
-
-  @override
-  void dispose() {
-    treeController.dispose();
-    super.dispose();
-  }
-
-  void _addNode(String title, MyNode parent) {
-    // Добавляем новый узел к выбранному родителю
-    setState(() {
-      parent.children.add(MyNode(title: title));
-      treeController.rebuild();
-    });
+  void _addNode(String title) {
+    if (selectedNode != null) {
+      setState(() {
+        selectedNode!.children.add(MyNode(title: title));
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: AddNodeForm(
-            onSubmit: _addNode,
-            roots: roots,
-          ),
+        AddNodeForm(
+          onAddNode: _addNode,
+          onNodeSelected: (node) {
+            setState(() {
+              selectedNode = node; // Устанавливаем выбранный узел
+            });
+          },
+          nodes: roots,
         ),
         Expanded(
-          child: TreeView<MyNode>(
-            treeController: treeController,
-            nodeBuilder: (BuildContext context, TreeEntry<MyNode> entry) {
-              return MyTreeTile(
-                key: ValueKey(entry.node),
-                entry: entry,
-                onTap: () => treeController.toggleExpansion(entry.node),
-              );
-            },
+          child: ListView(
+            children: _buildTree(roots),
           ),
         ),
       ],
     );
   }
+
+  List<Widget> _buildTree(List<MyNode> nodes) {
+    return nodes.map((node) {
+      return ExpansionTile(
+        title: Text(node.title),
+        children: _buildTree(node.children),
+      );
+    }).toList();
+  }
 }
 
+// Форма для добавления нового узла
 class AddNodeForm extends StatefulWidget {
-  final Function(String, MyNode) onSubmit;
-  final List<MyNode> roots;
+  final Function(String) onAddNode;
+  final Function(MyNode) onNodeSelected;
+  final List<MyNode> nodes;
 
-  const AddNodeForm({Key? key, required this.onSubmit, required this.roots}) : super(key: key);
+  const AddNodeForm({
+    Key? key,
+    required this.onAddNode,
+    required this.onNodeSelected,
+    required this.nodes,
+  }) : super(key: key);
 
   @override
   _AddNodeFormState createState() => _AddNodeFormState();
@@ -114,15 +95,17 @@ class AddNodeForm extends StatefulWidget {
 
 class _AddNodeFormState extends State<AddNodeForm> {
   final TextEditingController _controller = TextEditingController();
-  MyNode? _selectedParent;
+  MyNode? selectedNode;
 
-  List<MyNode> _getAllNodes(List<MyNode> nodes) {
-    List<MyNode> allNodes = [];
-    for (var node in nodes) {
-      allNodes.add(node);
-      allNodes.addAll(_getAllNodes(node.children));
+  void _submit() {
+    final title = _controller.text;
+    if (title.isNotEmpty && selectedNode != null) {
+      widget.onAddNode(title);
+      _controller.clear();
+      setState(() {
+        selectedNode = null; // Сбросить выбранный узел после добавления
+      });
     }
-    return allNodes;
   }
 
   @override
@@ -136,14 +119,18 @@ class _AddNodeFormState extends State<AddNodeForm> {
           ),
         ),
         DropdownButton<MyNode>(
-          hint: const Text('Select Parent'),
-          value: _selectedParent,
+          hint: const Text('Выберите узел'),
+          value: selectedNode,
           onChanged: (MyNode? newValue) {
             setState(() {
-              _selectedParent = newValue;
+              selectedNode = newValue;
+              if (newValue != null) {
+                widget.onNodeSelected(newValue);
+              }
             });
           },
-          items: _getAllNodes(widget.roots).map<DropdownMenuItem<MyNode>>((MyNode node) {
+          items: _getAllNodes(widget.nodes)
+              .map<DropdownMenuItem<MyNode>>((MyNode node) {
             return DropdownMenuItem<MyNode>(
               value: node,
               child: Text(node.title),
@@ -152,52 +139,18 @@ class _AddNodeFormState extends State<AddNodeForm> {
         ),
         IconButton(
           icon: const Icon(Icons.add),
-          onPressed: () {
-            if (_selectedParent != null && _controller.text.isNotEmpty) {
-              widget.onSubmit(_controller.text, _selectedParent!);
-              _controller.clear();
-              setState(() {
-                _selectedParent = null; // Сбрасываем выбор после добавления
-              });
-            }
-          },
+          onPressed: _submit,
         ),
       ],
     );
   }
-}
 
-class MyTreeTile extends StatelessWidget {
-  const MyTreeTile({
-    super.key,
-    required this.entry,
-    required this.onTap,
-  });
-
-  final TreeEntry<MyNode> entry;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: TreeIndentation(
-        entry: entry,
-        guide: const IndentGuide.connectingLines(indent: 48),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(4, 8, 8, 8),
-          child: Row(
-            children: [
-              FolderButton(
-                isOpen: entry.hasChildren ? entry.isExpanded : null,
-                onPressed: entry.hasChildren ? onTap : null,
-              ),
-              Text(entry.node.title),
-            ],
-          ),
-        ),
-      ),
-    );
+  List<MyNode> _getAllNodes(List<MyNode> nodes) {
+    List<MyNode> allNodes = [];
+    for (var node in nodes) {
+      allNodes.add(node);
+      allNodes.addAll(_getAllNodes(node.children));
+    }
+    return allNodes;
   }
 }
-
